@@ -1,9 +1,12 @@
 import { Link, useLocation } from "react-router-dom";
-import { Calendar, LayoutDashboard, ListChecks, Sparkles } from "lucide-react";
+import { Calendar, LayoutDashboard, ListChecks, Sparkles, LogIn, User, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
 
 const Header = () => {
   const location = useLocation();
+  const { user, isAuthenticated, logout } = useAuth();
 
   const navItems = [
     { path: "/", label: "Home", icon: Calendar },
@@ -43,6 +46,33 @@ const Header = () => {
               </Link>
             );
           })}
+          
+          {isAuthenticated ? (
+            <div className="flex items-center gap-2 ml-2">
+              <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-foreground">
+                <User className="h-4 w-4 mr-1" />
+                {user?.username}
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={logout}
+                className="px-4"
+              >
+                <LogOut className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">Logout</span>
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-2 ml-2">
+              <Link to="/login">
+                <Button variant="outline" size="sm">
+                  <LogIn className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">Login</span>
+                </Button>
+              </Link>
+            </div>
+          )}
         </nav>
       </div>
     </header>

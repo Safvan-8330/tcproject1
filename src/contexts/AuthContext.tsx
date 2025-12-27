@@ -1,0 +1,88 @@
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+
+interface AuthContextType {
+  user: { username: string } | null;
+  login: (username: string, password: string) => Promise<boolean>;
+  logout: () => void;
+  register: (username: string, email: string, password: string) => Promise<boolean>;
+  isAuthenticated: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider = ({ children }: AuthProviderProps) => {
+  const [user, setUser] = useState<{ username: string } | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check if user is logged in on initial load
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        setIsAuthenticated(true);
+      } catch (error) {
+        console.error("Error parsing stored user:", error);
+        localStorage.removeItem("user");
+      }
+    }
+  }, []);
+
+  const login = async (username: string, password: string): Promise<boolean> => {
+    // In a real app, you would send credentials to your backend
+    // For this demo, we'll just check if both fields are provided
+    if (username && password) {
+      const userData = { username };
+      localStorage.setItem("user", JSON.stringify(userData));
+      setUser(userData);
+      setIsAuthenticated(true);
+      return true;
+    }
+    return false;
+  };
+
+  const register = async (username: string, email: string, password: string): Promise<boolean> => {
+    // In a real app, you would send registration data to your backend
+    // For this demo, we'll just store the user data
+    if (username && email && password) {
+      const userData = { username, email };
+      localStorage.setItem("user", JSON.stringify(userData));
+      setUser({ username });
+      setIsAuthenticated(true);
+      return true;
+    }
+    return false;
+  };
+
+  const logout = () => {
+    localStorage.removeItem("user");
+    setUser(null);
+    setIsAuthenticated(false);
+    navigate("/login");
+  };
+
+  const value = {
+    user,
+    login,
+    logout,
+    register,
+    isAuthenticated,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
