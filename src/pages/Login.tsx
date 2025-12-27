@@ -19,18 +19,18 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const success = await login(username, password);
+      const result = await login(username, password);
       
-      if (success) {
+      if (result.success) {
         toast({
           title: "Login Successful",
           description: `Welcome back, ${username}!`,
         });
         
-        // Redirect to home or previous page
+        // Redirect to home page after successful login
         navigate("/");
       } else {
-        throw new Error("Invalid credentials");
+        throw new Error(result.error || "Invalid credentials");
       }
     } catch (error) {
       toast({
@@ -83,6 +83,12 @@ const Login = () => {
             Don't have an account?{" "}
             <Link to="/register" className="underline underline-offset-4 hover:text-primary">
               Register
+            </Link>
+          </div>
+          <div className="mt-2 text-center text-sm text-muted-foreground">
+            Are you an admin?{" "}
+            <Link to="/admin-login" className="underline underline-offset-4 hover:text-primary">
+              Login as admin
             </Link>
           </div>
         </CardContent>

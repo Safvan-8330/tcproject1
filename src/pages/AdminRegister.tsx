@@ -62,8 +62,8 @@ const AdminRegister = () => {
           description: `Welcome, ${username}! You have registered as an admin.`,
         });
         
-        // Redirect to admin dashboard after successful registration
-        navigate("/admin");
+        // Redirect to admin login page after successful registration
+        navigate("/admin-login");
       } else {
         throw new Error("Registration failed");
       }

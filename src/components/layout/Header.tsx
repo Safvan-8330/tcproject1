@@ -7,15 +7,20 @@ import { Button } from "@/components/ui/button";
 const Header = () => {
   const location = useLocation();
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
+  
+  // Hide navigation items on login and register pages
+  const hideNavItems = ["/login", "/register", "/admin-register"].includes(location.pathname);
 
-  const navItems = [
-    { path: "/", label: "Home", icon: Calendar },
-    { path: "/my-appointments", label: "My Appointments", icon: ListChecks },
-  ];
+  // Different navigation items based on user role
+  const navItems = [];
 
-  // Add admin route only for admin users
   if (isAdmin) {
+    // Admin users only see the admin dashboard
     navItems.push({ path: "/admin", label: "Admin", icon: LayoutDashboard });
+  } else {
+    // Regular users see home and appointments
+    navItems.push({ path: "/", label: "Home", icon: Calendar });
+    navItems.push({ path: "/my-appointments", label: "My Appointments", icon: ListChecks });
   }
 
   return (
@@ -31,7 +36,7 @@ const Header = () => {
         </Link>
 
         <nav className="flex items-center gap-1">
-          {navItems.map((item) => {
+          {!hideNavItems && navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
             return (
@@ -51,7 +56,7 @@ const Header = () => {
             );
           })}
           
-          {isAuthenticated ? (
+          {!hideNavItems && isAuthenticated ? (
             <div className="flex items-center gap-2 ml-2">
               <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-foreground">
                 <User className="h-4 w-4 mr-1" />
@@ -72,7 +77,7 @@ const Header = () => {
                 <span className="hidden sm:inline">Logout</span>
               </Button>
             </div>
-          ) : (
+          ) : !hideNavItems ? (
             <div className="flex gap-2 ml-2">
               <Link to="/login">
                 <Button variant="outline" size="sm">
@@ -81,7 +86,7 @@ const Header = () => {
                 </Button>
               </Link>
             </div>
-          )}
+          ) : null}
         </nav>
       </div>
     </header>

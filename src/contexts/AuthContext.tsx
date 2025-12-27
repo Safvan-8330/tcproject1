@@ -1,9 +1,15 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+
+interface LoginResult {
+  success: boolean;
+  error?: string;
+}
 
 interface AuthContextType {
   user: { username: string; email?: string; role?: string } | null;
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (username: string, password: string) => Promise<LoginResult>;
   logout: () => void;
   register: (username: string, email: string, password: string) => Promise<boolean>;
   registerAdmin: (username: string, email: string, password: string) => Promise<boolean>;
@@ -29,6 +35,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<{ username: string; email?: string; role?: string } | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     // Check if user is logged in on initial load
@@ -45,17 +52,34 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }, []);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = async (username: string, password: string): Promise<LoginResult> => {
     // In a real app, you would send credentials to your backend
-    // For this demo, we'll just check if both fields are provided
+    // For this demo, we'll check if user exists in localStorage
     if (username && password) {
-      const userData = { username };
-      localStorage.setItem("user", JSON.stringify(userData));
-      setUser(userData);
-      setIsAuthenticated(true);
-      return true;
+      // Retrieve the user from localStorage to preserve role info
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          if (parsedUser.username === username) {
+            // User exists, set the user data
+            setUser(parsedUser);
+            setIsAuthenticated(true);
+            return { success: true };
+          }
+        } catch (error) {
+          console.error("Error parsing stored user:", error);
+        }
+      }
+      // If user not found or parsing failed
+      toast({
+        title: "Login Failed",
+        description: "Invalid username or password. Please try again.",
+        variant: "destructive",
+      });
+      return { success: false, error: "Invalid username or password" };
     }
-    return false;
+    return { success: false, error: "Username and password are required" };
   };
 
   const register = async (username: string, email: string, password: string): Promise<boolean> => {

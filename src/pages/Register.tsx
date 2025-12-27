@@ -50,8 +50,8 @@ const Register = () => {
           description: `Welcome, ${username}! Your account has been created.`,
         });
         
-        // Redirect to home page after successful registration
-        navigate("/");
+        // Redirect to login page after successful registration
+        navigate("/login");
       } else {
         throw new Error("Registration failed");
       }
@@ -128,12 +128,6 @@ const Register = () => {
             Already have an account?{" "}
             <Link to="/login" className="underline underline-offset-4 hover:text-primary">
               Sign in
-            </Link>
-          </div>
-          <div className="mt-2 text-center text-sm text-muted-foreground">
-            Are you an admin?{" "}
-            <Link to="/admin-register" className="underline underline-offset-4 hover:text-primary">
-              Register as admin
             </Link>
           </div>
         </CardContent>
