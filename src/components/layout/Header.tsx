@@ -6,13 +6,17 @@ import { Button } from "@/components/ui/button";
 
 const Header = () => {
   const location = useLocation();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, isAdmin, logout } = useAuth();
 
   const navItems = [
     { path: "/", label: "Home", icon: Calendar },
     { path: "/my-appointments", label: "My Appointments", icon: ListChecks },
-    { path: "/admin", label: "Admin", icon: LayoutDashboard },
   ];
+
+  // Add admin route only for admin users
+  if (isAdmin) {
+    navItems.push({ path: "/admin", label: "Admin", icon: LayoutDashboard });
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-lg">
@@ -52,6 +56,11 @@ const Header = () => {
               <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-foreground">
                 <User className="h-4 w-4 mr-1" />
                 {user?.username}
+                {isAdmin && (
+                  <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-destructive text-destructive-foreground">
+                    ADMIN
+                  </span>
+                )}
               </div>
               <Button 
                 variant="outline" 

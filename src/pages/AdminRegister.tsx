@@ -6,15 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
-const Register = () => {
+const AdminRegister = () => {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [adminKey, setAdminKey] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { register } = useAuth();
+  const { registerAdmin } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,17 +42,28 @@ const Register = () => {
       return;
     }
 
+    // Check if admin key is correct (in a real app, this would be more secure)
+    if (adminKey !== "admin-register-key") { // This is a separate key for admin registration
+      toast({
+        title: "Registration Failed",
+        description: "Invalid admin registration key.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const success = await register(username, email, password);
+      const success = await registerAdmin(username, email, password);
       
       if (success) {
         toast({
-          title: "Registration Successful",
-          description: `Welcome, ${username}! Your account has been created.`,
+          title: "Admin Registration Successful",
+          description: `Welcome, ${username}! You have registered as an admin.`,
         });
         
-        // Redirect to home page after successful registration
-        navigate("/");
+        // Redirect to admin dashboard after successful registration
+        navigate("/admin");
       } else {
         throw new Error("Registration failed");
       }
@@ -70,8 +82,8 @@ const Register = () => {
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center py-8">
       <Card className="w-full max-w-md shadow-soft">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-          <CardDescription>Enter your details to create a new account</CardDescription>
+          <CardTitle className="text-2xl font-bold">Register as Admin</CardTitle>
+          <CardDescription>Enter your details and admin key to register as an admin</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -119,8 +131,22 @@ const Register = () => {
                 required
               />
             </div>
+            <div className="space-y-2">
+              <label htmlFor="adminKey" className="text-sm font-medium">Admin Registration Key</label>
+              <Input
+                id="adminKey"
+                type="password"
+                placeholder="Enter admin registration key"
+                value={adminKey}
+                onChange={(e) => setAdminKey(e.target.value)}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Contact system administrator for the admin registration key
+              </p>
+            </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Creating Account..." : "Create Account"}
+              {isLoading ? "Creating Admin Account..." : "Create Admin Account"}
             </Button>
           </form>
           
@@ -130,16 +156,10 @@ const Register = () => {
               Sign in
             </Link>
           </div>
-          <div className="mt-2 text-center text-sm text-muted-foreground">
-            Are you an admin?{" "}
-            <Link to="/admin-register" className="underline underline-offset-4 hover:text-primary">
-              Register as admin
-            </Link>
-          </div>
         </CardContent>
       </Card>
     </div>
   );
 };
 
-export default Register;
+export default AdminRegister;

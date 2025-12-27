@@ -33,7 +33,7 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     // Check if user is an admin
-    const isAdmin = user?.username === 'admin';
+    const isAdmin = user?.role === 'admin';
     setIsAuthenticated(isAdmin);
     
     if (isAuthenticated) {

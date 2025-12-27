@@ -2,11 +2,13 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { useNavigate } from "react-router-dom";
 
 interface AuthContextType {
-  user: { username: string } | null;
+  user: { username: string; email?: string; role?: string } | null;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   register: (username: string, email: string, password: string) => Promise<boolean>;
+  registerAdmin: (username: string, email: string, password: string) => Promise<boolean>;
   isAuthenticated: boolean;
+  isAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,7 +26,7 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<{ username: string } | null>(null);
+  const [user, setUser] = useState<{ username: string; email?: string; role?: string } | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const navigate = useNavigate();
 
@@ -62,12 +64,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (username && email && password) {
       const userData = { username, email };
       localStorage.setItem("user", JSON.stringify(userData));
-      setUser({ username });
+      setUser({ username, email });
       setIsAuthenticated(true);
       return true;
     }
     return false;
   };
+
+  const registerAdmin = async (username: string, email: string, password: string): Promise<boolean> => {
+    // In a real app, you would send registration data to your backend
+    // For this demo, we'll just store the user data with admin role
+    if (username && email && password) {
+      const userData = { username, email, role: 'admin' };
+      localStorage.setItem("user", JSON.stringify(userData));
+      setUser({ username, email, role: 'admin' });
+      setIsAuthenticated(true);
+      return true;
+    }
+    return false;
+  };
+
 
   const logout = () => {
     localStorage.removeItem("user");
@@ -81,7 +97,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     login,
     logout,
     register,
+    registerAdmin,
     isAuthenticated,
+    isAdmin: user?.role === 'admin',
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

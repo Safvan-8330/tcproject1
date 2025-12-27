@@ -4,12 +4,15 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Header from "./components/layout/Header";
-import Index from "./pages/index.tsx";
+import LandingPage from "./pages/LandingPage";
+import Home from "./pages/index.tsx";
+import AuthenticatedHome from "./pages/AuthenticatedHome";
 import BookAppointment from "./pages/BookAppointment";
 import MyAppointments from "./pages/MyAppointments";
 import AdminDashboard from "./pages/AdminDashboard";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import AdminRegister from "./pages/AdminRegister";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,12 +28,14 @@ const App = () => (
           <Header />
           <main>
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<LandingPage />} />
               <Route path="/book" element={<ProtectedRoute><BookAppointment /></ProtectedRoute>} />
               <Route path="/my-appointments" element={<ProtectedRoute><MyAppointments /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              
+              <Route path="/admin-register" element={<AdminRegister />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
