@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { LayoutDashboard, ArrowLeft, Calendar, Users, CheckCircle, XCircle, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AppointmentCard from "@/components/AppointmentCard";
 import { getAppointments, updateAppointmentStatus, Appointment, CATEGORIES, AppointmentCategory } from "@/lib/appointments";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const ADMIN_PASSWORD = "admin123";
 
@@ -22,17 +23,23 @@ const categoryColors: Record<AppointmentCategory, string> = {
 
 const AdminDashboard = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { user, isAuthenticated: isUserAuthenticated } = useAuth();
+  const [adminPassword, setAdminPassword] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState("");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [activeTab, setActiveTab] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
   useEffect(() => {
+    // Check if user is an admin
+    const isAdmin = user?.role === 'admin';
+    setIsAuthenticated(isAdmin);
+    
     if (isAuthenticated) {
       loadAppointments();
     }
-  }, [isAuthenticated]);
+  }, [isUserAuthenticated, user]);
 
   const loadAppointments = () => {
     const all = getAppointments().sort(
@@ -43,7 +50,7 @@ const AdminDashboard = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === ADMIN_PASSWORD) {
+    if (adminPassword === ADMIN_PASSWORD) {
       setIsAuthenticated(true);
       toast({
         title: "Welcome, Admin!",
@@ -115,8 +122,8 @@ const AdminDashboard = () => {
                   id="password"
                   type="password"
                   placeholder="Enter admin password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
                   className="h-11"
                 />
                 <p className="text-xs text-muted-foreground">
