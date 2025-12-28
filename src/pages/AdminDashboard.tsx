@@ -6,9 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AppointmentCard from "@/components/AppointmentCard";
-import { getAppointments, updateAppointmentStatus, Appointment, CATEGORIES, AppointmentCategory } from "@/lib/appointments";
+import { Appointment, CATEGORIES, AppointmentCategory } from "@/lib/appointments";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 const ADMIN_PASSWORD = "admin123";
 
@@ -30,28 +31,62 @@ const AdminDashboard = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [activeTab, setActiveTab] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     // Check if user is an admin
     const isAdmin = user?.role === 'admin';
     setIsAuthenticated(isAdmin);
     
-    if (isAuthenticated) {
+    if (isAdmin) {
       loadAppointments();
     }
   }, [isUserAuthenticated, user]);
 
-  const loadAppointments = () => {
-    const all = getAppointments().sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-    setAppointments(all);
+  const loadAppointments = async () => {
+    setIsLoading(true);
+    try {
+      // Fetch all appointments with user profile data
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          profiles (full_name, email)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const mappedAppointments: Appointment[] = (data || []).map((item: any) => ({
+        id: item.id,
+        name: item.profiles?.full_name || "Unknown User",
+        email: item.profiles?.email || "No Email",
+        date: item.date,
+        timeSlot: item.time,     // DB: time -> App: timeSlot
+        category: item.service,  // DB: service -> App: category
+        reason: item.notes,      // DB: notes -> App: reason
+        status: item.status,
+        createdAt: item.created_at,
+      }));
+
+      setAppointments(mappedAppointments);
+    } catch (error: any) {
+      console.error("Error loading appointments:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load appointments: " + error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (adminPassword === ADMIN_PASSWORD) {
       setIsAuthenticated(true);
+      loadAppointments(); // Load data after manual login
       toast({
         title: "Welcome, Admin!",
         description: "You are now logged in to the dashboard.",
@@ -65,23 +100,35 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleApprove = (id: string) => {
-    updateAppointmentStatus(id, "approved");
-    loadAppointments();
-    toast({
-      title: "Appointment Approved",
-      description: "The appointment has been approved successfully.",
-    });
+  const updateStatus = async (id: string, newStatus: 'approved' | 'rejected') => {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: newStatus })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // Update local state to reflect change immediately
+      setAppointments(prev => prev.map(appt => 
+        appt.id === id ? { ...appt, status: newStatus } : appt
+      ));
+
+      toast({
+        title: `Appointment ${newStatus === 'approved' ? 'Approved' : 'Rejected'}`,
+        description: "The appointment status has been updated.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Update Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleReject = (id: string) => {
-    updateAppointmentStatus(id, "rejected");
-    loadAppointments();
-    toast({
-      title: "Appointment Rejected",
-      description: "The appointment has been rejected.",
-    });
-  };
+  const handleApprove = (id: string) => updateStatus(id, "approved");
+  const handleReject = (id: string) => updateStatus(id, "rejected");
 
   const filteredAppointments = appointments.filter((apt) => {
     const statusMatch = activeTab === "all" || apt.status === activeTab;
@@ -158,7 +205,7 @@ const AdminDashboard = () => {
             <p className="text-muted-foreground">Manage all appointment requests</p>
           </div>
           <Button variant="outline" onClick={loadAppointments} className="self-start sm:self-auto">
-            <RefreshCw className="h-4 w-4 mr-2" />
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>

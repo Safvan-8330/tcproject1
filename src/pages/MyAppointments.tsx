@@ -1,32 +1,90 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Calendar, Mail, Search, ArrowLeft, CalendarX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import AppointmentCard from "@/components/AppointmentCard";
-import { getAppointmentsByEmail, Appointment } from "@/lib/appointments";
+import { Appointment } from "@/lib/appointments";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 const MyAppointments = () => {
+  const { user } = useAuth();
   const [email, setEmail] = useState("");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Auto-fill email if user is logged in
+  useEffect(() => {
+    if (user?.email) {
+      setEmail(user.email);
+    }
+  }, [user]);
+
+  const fetchAppointments = async (searchEmail: string) => {
+    setIsLoading(true);
+    try {
+      // 1. Get user profile ID based on email
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', searchEmail)
+        .single();
+
+      if (profileError || !profileData) {
+        setAppointments([]);
+        return;
+      }
+
+      // 2. Fetch appointments for this user
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          profiles (full_name, email)
+        `)
+        .eq('user_id', profileData.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // 3. Map Supabase data to your App's Appointment interface
+      const mappedAppointments: Appointment[] = (data || []).map((item: any) => ({
+        id: item.id,
+        name: item.profiles?.full_name || "Unknown",
+        email: item.profiles?.email || searchEmail,
+        date: item.date,
+        timeSlot: item.time,     // Database column 'time' -> Interface 'timeSlot'
+        category: item.service,  // Database column 'service' -> Interface 'category'
+        reason: item.notes,      // Database column 'notes' -> Interface 'reason'
+        status: item.status,
+        createdAt: item.created_at,
+      }));
+
+      setAppointments(mappedAppointments);
+    } catch (error) {
+      console.error("Error fetching appointments:", error);
+      setAppointments([]);
+    } finally {
+      setHasSearched(true);
+      setIsLoading(false);
+    }
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
-
-    setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 400));
-    
-    const results = getAppointmentsByEmail(email);
-    setAppointments(results.sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    ));
-    setHasSearched(true);
-    setIsLoading(false);
+    await fetchAppointments(email);
   };
+
+  // Optional: Auto-fetch on mount if user is logged in
+  useEffect(() => {
+    if (user?.email) {
+      fetchAppointments(user.email);
+    }
+  }, [user]);
 
   return (
     <div className="min-h-[calc(100vh-4rem)] py-8 md:py-12">
@@ -45,7 +103,7 @@ const MyAppointments = () => {
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">My Appointments</h1>
           <p className="text-muted-foreground text-lg">
-            Enter your email to view all your bookings
+            View your scheduled bookings
           </p>
         </div>
 
@@ -130,7 +188,7 @@ const MyAppointments = () => {
               <Search className="h-12 w-12 text-muted-foreground/50" />
             </div>
             <p className="text-muted-foreground text-lg">
-              Enter your email address above to view your appointments
+              Search to view your appointments
             </p>
           </div>
         )}
