@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase"; // Import the client you created
 
 interface LoginResult {
   success: boolean;
@@ -8,13 +9,15 @@ interface LoginResult {
 }
 
 interface AuthContextType {
-  user: { username: string; email?: string; role?: string } | null;
-  login: (username: string, password: string) => Promise<LoginResult>;
+  // Supabase uses 'email' and 'id' primarily, but we keep your 'username' for the UI
+  user: { username: string; email?: string; role?: string; id?: string } | null;
+  login: (email: string, password: string) => Promise<LoginResult>;
   logout: () => void;
   register: (username: string, email: string, password: string) => Promise<boolean>;
   registerAdmin: (username: string, email: string, password: string) => Promise<boolean>;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  loading: boolean; // Added to prevent redirect loops while checking session
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,85 +35,109 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<{ username: string; email?: string; role?: string } | null>(null);
+  const [user, setUser] = useState<{ username: string; email?: string; role?: string; id?: string } | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if user is logged in on initial load
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-        setIsAuthenticated(true);
-      } catch (error) {
-        console.error("Error parsing stored user:", error);
-        localStorage.removeItem("user");
+    // Check for active session on load
+    const initializeAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        handleUserSession(session.user);
       }
-    }
+      setLoading(false);
+    };
+
+    initializeAuth();
+
+    // Listen for auth changes (login, logout, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        handleUserSession(session.user);
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (username: string, password: string): Promise<LoginResult> => {
-    // In a real app, you would send credentials to your backend
-    // For this demo, we'll check if user exists in localStorage
-    if (username && password) {
-      // Retrieve the user from localStorage to preserve role info
-      const storedUser = localStorage.getItem("user");
-      if (storedUser) {
-        try {
-          const parsedUser = JSON.parse(storedUser);
-          if (parsedUser.username === username) {
-            // User exists, set the user data
-            setUser(parsedUser);
-            setIsAuthenticated(true);
-            return { success: true };
-          }
-        } catch (error) {
-          console.error("Error parsing stored user:", error);
-        }
-      }
-      // If user not found or parsing failed
+  // Helper to fetch roles and set user state
+  const handleUserSession = async (supabaseUser: any) => {
+    const { data: roleData } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', supabaseUser.id)
+      .single();
+
+    const userData = {
+      id: supabaseUser.id,
+      email: supabaseUser.email,
+      username: supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0],
+      role: roleData?.role || 'user'
+    };
+
+    setUser(userData);
+    setIsAuthenticated(true);
+  };
+
+  const login = async (email: string, password: string): Promise<LoginResult> => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    if (error) {
       toast({
         title: "Login Failed",
-        description: "Invalid username or password. Please try again.",
+        description: error.message,
         variant: "destructive",
       });
-      return { success: false, error: "Invalid username or password" };
+      return { success: false, error: error.message };
     }
-    return { success: false, error: "Username and password are required" };
+
+    return { success: true };
   };
 
   const register = async (username: string, email: string, password: string): Promise<boolean> => {
-    // In a real app, you would send registration data to your backend
-    // For this demo, we'll just store the user data
-    if (username && email && password) {
-      const userData = { username, email };
-      localStorage.setItem("user", JSON.stringify(userData));
-      setUser({ username, email });
-      setIsAuthenticated(true);
-      return true;
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        data: {
+          full_name: username, // This stores the username in Supabase metadata
+        }
+      }
+    });
+
+    if (error) {
+      toast({
+        title: "Registration Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+      return false;
     }
-    return false;
+
+    toast({
+      title: "Success",
+      description: "Please check your email to confirm registration.",
+    });
+    return true;
   };
 
   const registerAdmin = async (username: string, email: string, password: string): Promise<boolean> => {
-    // In a real app, you would send registration data to your backend
-    // For this demo, we'll just store the user data with admin role
-    if (username && email && password) {
-      const userData = { username, email, role: 'admin' };
-      localStorage.setItem("user", JSON.stringify(userData));
-      setUser({ username, email, role: 'admin' });
-      setIsAuthenticated(true);
-      return true;
-    }
-    return false;
+    // Note: Admin role usually needs manual approval in Supabase dashboard for security
+    return register(username, email, password);
   };
 
-
-  const logout = () => {
-    localStorage.removeItem("user");
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
     setIsAuthenticated(false);
     navigate("/login");
@@ -124,7 +151,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     registerAdmin,
     isAuthenticated,
     isAdmin: user?.role === 'admin',
+    loading
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
 };

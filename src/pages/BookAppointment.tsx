@@ -10,8 +10,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { saveAppointment, TIME_SLOTS, CATEGORIES, AppointmentCategory, getCategoryById } from "@/lib/appointments";
+import { TIME_SLOTS, CATEGORIES, AppointmentCategory, getCategoryById } from "@/lib/appointments";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase"; 
 
 const categoryIcons = {
   doctor: Stethoscope,
@@ -75,20 +76,52 @@ const BookAppointment = () => {
     }
 
     setIsLoading(true);
-    
-    await new Promise(resolve => setTimeout(resolve, 800));
 
-    saveAppointment({
-      name: formData.name,
-      email: formData.email,
-      date: formData.date.toISOString(),
-      timeSlot: formData.timeSlot,
-      reason: formData.reason || undefined,
-      category: formData.category,
-    });
+    try {
+      // 1. Get current authenticated user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    setIsLoading(false);
-    setIsSubmitted(true);
+      if (authError || !user) {
+        toast({
+          title: "Login Required",
+          description: "You must be logged in to book an appointment.",
+          variant: "destructive",
+        });
+        navigate("/login");
+        return;
+      }
+
+      // 2. Insert into Supabase matching your screenshot schema
+      const { error } = await supabase
+        .from('appointments')
+        .insert([
+          {
+            user_id: user.id,
+            date: format(formData.date, "yyyy-MM-dd"), // Matches 'date' column (type: date)
+            time: formData.timeSlot,                  // Matches 'time' column (type: text)
+            service: formData.category,               // Matches 'service' column (type: text)
+            notes: formData.reason || null,           // Matches 'notes' column (type: text)
+            status: 'pending'                         // Matches 'status' column (type: text)
+          }
+        ]);
+
+      if (error) throw error;
+
+      setIsSubmitted(true);
+      toast({
+        title: "Success",
+        description: "Your appointment has been booked successfully!",
+      });
+    } catch (error: any) {
+      console.error("Database error:", error);
+      toast({
+        title: "Booking Error",
+        description: error.message || "Failed to save appointment to the database.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const selectedCategory = getCategoryById(formData.category);
@@ -169,17 +202,17 @@ const BookAppointment = () => {
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {CATEGORIES.map((category, index) => {
-              const Icon = categoryIcons[category.id];
+              const Icon = categoryIcons[category.id as keyof typeof categoryIcons];
               return (
                 <button
                   key={category.id}
-                  onClick={() => handleCategorySelect(category.id)}
+                  onClick={() => handleCategorySelect(category.id as AppointmentCategory)}
                   className="group text-left animate-slide-up"
                   style={{ animationDelay: `${index * 0.1}s` }}
                 >
                   <div className="relative p-6 rounded-2xl bg-card shadow-soft hover:shadow-colorful transition-all duration-500 border border-border/50 overflow-hidden h-full">
-                    <div className={`absolute top-0 right-0 w-32 h-32 ${categoryGradients[category.id]} opacity-10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 group-hover:opacity-20 transition-opacity`} />
-                    <div className={`mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl ${categoryGradients[category.id]} shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                    <div className={`absolute top-0 right-0 w-32 h-32 ${categoryGradients[category.id as AppointmentCategory]} opacity-10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 group-hover:opacity-20 transition-opacity`} />
+                    <div className={`mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl ${categoryGradients[category.id as AppointmentCategory]} shadow-lg group-hover:scale-110 transition-transform duration-300`}>
                       <Icon className="h-7 w-7 text-primary-foreground" />
                     </div>
                     <h3 className="text-xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors">

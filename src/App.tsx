@@ -16,6 +16,33 @@ import AdminRegister from "./pages/AdminRegister";
 import AdminLogin from "./pages/AdminLogin";
 import NotFound from "./pages/NotFound";
 
+// --- NEW CODE START ---
+import { useEffect } from "react";
+import { supabase } from "./lib/supabase"; // Ensure this matches your file path
+import { toast } from "sonner";
+
+const SupabaseConnectionCheck = () => {
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        const { data, error } = await supabase.from('profiles').select('id').limit(1);
+        if (error) {
+          console.error("Supabase Connection Error:", error.message);
+          toast.error("Database connection failed: " + error.message);
+        } else {
+          console.log("Supabase Connected Successfully!");
+          toast.success("Connected to your custom Supabase backend");
+        }
+      } catch (err) {
+        console.error("Check failed:", err);
+      }
+    };
+    checkConnection();
+  }, []);
+  return null; // This component doesn't render anything UI-wise
+};
+// --- NEW CODE END ---
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -25,6 +52,9 @@ const App = () => (
     <BrowserRouter>
       {/* 2. AuthProvider is now INSIDE the router, so useNavigate() will work */}
       <AuthProvider>
+        {/* --- ADDED TEST COMPONENT HERE --- */}
+        <SupabaseConnectionCheck /> 
+        
         <div className="min-h-screen bg-background">
           <Header />
           <main>
