@@ -1,222 +1,191 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { Calendar, Mail, Search, ArrowLeft, CalendarX, Trash2, Clock } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Appointment, getCategoryById } from "@/lib/appointments";
-import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { format } from "date-fns";
+import { Calendar as CalendarIcon, Clock, ArrowLeft, AlertCircle, FileText } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
-// 1. Import the Alert Dialog components
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+
+// Define the shape of an appointment object based on your schema
+interface Appointment {
+  id: string;
+  date: string;
+  time: string;
+  service: string;
+  status: string;
+  notes?: string;
+  created_at: string;
+}
 
 const MyAppointments = () => {
-  const { user } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
-  const [email, setEmail] = useState("");
+  
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (user?.email) {
-      setEmail(user.email);
+    // 1. Check authentication and redirect if needed
+    if (!authLoading && !isAuthenticated) {
+      navigate("/login");
+      return;
     }
-  }, [user]);
 
-  const fetchAppointments = async (searchEmail: string) => {
-    setIsLoading(true);
-    try {
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', searchEmail)
-        .single();
+    // 2. Fetch appointments automatically if user exists
+    const fetchAppointments = async () => {
+      if (!user?.id) return;
 
-      if (profileError || !profileData) {
-        setAppointments([]);
-        return;
+      try {
+        const { data, error } = await supabase
+          .from('appointments')
+          .select('*')
+          .eq('user_id', user.id) // Filter by logged-in user's ID
+          .order('date', { ascending: true }); // Sort by upcoming dates
+
+        if (error) throw error;
+
+        setAppointments(data || []);
+      } catch (error: any) {
+        console.error('Error fetching appointments:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load your appointments. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-      const { data, error } = await supabase
-        .from('appointments')
-        .select(`*, profiles (full_name, email)`)
-        .eq('user_id', profileData.id)
-        .order('created_at', { ascending: false });
+    if (user) {
+      fetchAppointments();
+    }
+  }, [user, isAuthenticated, authLoading, navigate, toast]);
 
-      if (error) throw error;
-
-      const mappedAppointments: Appointment[] = (data || []).map((item: any) => ({
-        id: item.id,
-        name: item.profiles?.full_name || "Unknown",
-        email: item.profiles?.email || searchEmail,
-        date: item.date,
-        timeSlot: item.time,
-        category: item.service,
-        reason: item.notes,
-        status: item.status,
-        createdAt: item.created_at,
-      }));
-
-      setAppointments(mappedAppointments);
-    } catch (error) {
-      console.error("Error fetching appointments:", error);
-      setAppointments([]);
-    } finally {
-      setHasSearched(true);
-      setIsLoading(false);
+  // Helper to color-code statuses
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'confirmed': return 'bg-green-500/10 text-green-600 hover:bg-green-500/20 border-green-200';
+      case 'cancelled': return 'bg-red-500/10 text-red-600 hover:bg-red-500/20 border-red-200';
+      case 'completed': return 'bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 border-blue-200';
+      default: return 'bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 border-yellow-200'; // Pending
     }
   };
 
-  const handleDelete = async (id: string) => {
-    // window.confirm is removed because the UI handles it now
-    try {
-      const { error } = await supabase
-        .from('appointments')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setAppointments((prev) => prev.filter((appt) => appt.id !== id));
-
-      toast({
-        title: "Success",
-        description: "Appointment permanently deleted.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete from database.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-    await fetchAppointments(email);
-  };
-
-  useEffect(() => {
-    if (user?.email) {
-      fetchAppointments(user.email);
-    }
-  }, [user]);
+  if (authLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] py-8 md:py-12">
-      <div className="container max-w-3xl">
-        <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
-          <ArrowLeft className="h-4 w-4" /> Back to Home
-        </Link>
-
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2">My Appointments</h1>
-          <p className="text-muted-foreground">View your scheduled bookings</p>
+    <div className="min-h-[calc(100vh-4rem)] py-8 md:py-12 bg-muted/30">
+      <div className="container max-w-5xl">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">My Appointments</h1>
+            <p className="text-muted-foreground mt-1">
+              Manage and view your upcoming services
+            </p>
+          </div>
+          <Button variant="outline" asChild>
+            <Link to="/">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Home
+            </Link>
+          </Button>
         </div>
 
-        <Card className="shadow-colorful mb-8 border-0">
-          <CardContent className="pt-6">
-            <form onSubmit={handleSearch} className="flex gap-3">
-              <div className="flex-1 relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="email"
-                  placeholder="Enter your email address..."
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 h-12"
-                />
+        {/* Loading State */}
+        {isLoading ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-48 rounded-xl bg-muted animate-pulse" />
+            ))}
+          </div>
+        ) : appointments.length === 0 ? (
+          /* Empty State */
+          <Card className="border-dashed border-2 bg-transparent shadow-none">
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+                <CalendarIcon className="h-8 w-8 text-muted-foreground" />
               </div>
-              <Button type="submit" variant="hero" size="lg" disabled={isLoading} className="h-12">
-                {isLoading ? "Searching..." : "Search"}
+              <h3 className="text-xl font-semibold mb-2">No appointments yet</h3>
+              <p className="text-muted-foreground max-w-sm mb-6">
+                You haven't booked any services yet. Browse our services to get started.
+              </p>
+              <Button asChild>
+                <Link to="/book-appointment">Book Now</Link>
               </Button>
-            </form>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : (
+          /* Appointments List */
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 animate-fade-in">
+            {appointments.map((appointment) => (
+              <Card key={appointment.id} className="overflow-hidden hover:shadow-md transition-shadow duration-300">
+                <CardHeader className="pb-3 bg-muted/30 border-b">
+                  <div className="flex justify-between items-start gap-2">
+                    <CardTitle className="text-lg font-semibold capitalize">
+                      {appointment.service}
+                    </CardTitle>
+                    <Badge variant="outline" className={getStatusColor(appointment.status)}>
+                      {appointment.status}
+                    </Badge>
+                  </div>
+                  <CardDescription>
+                    Booked on {format(new Date(appointment.created_at), "MMM d, yyyy")}
+                  </CardDescription>
+                </CardHeader>
+                
+                <CardContent className="pt-4 space-y-3">
+                  <div className="flex items-center gap-3 text-sm">
+                    <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                      <CalendarIcon className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Date</p>
+                      <p className="font-medium">
+                        {format(new Date(appointment.date), "EEEE, MMMM do, yyyy")}
+                      </p>
+                    </div>
+                  </div>
 
-        {hasSearched && (
-          <div className="space-y-4">
-            {appointments.length > 0 ? (
-              <div className="grid gap-4">
-                {appointments.map((appointment) => {
-                  const category = getCategoryById(appointment.category);
-                  return (
-                    <Card key={appointment.id} className="overflow-hidden border-0 shadow-soft">
-                      <div className="flex items-center justify-between p-5">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-bold text-lg capitalize">{category?.name || appointment.category}</h3>
-                            <span className={cn(
-                              "text-[10px] px-2 py-0.5 rounded-full font-bold uppercase",
-                              appointment.status === 'approved' ? "bg-green-100 text-green-700" : 
-                              appointment.status === 'rejected' ? "bg-red-100 text-red-700" : 
-                              "bg-yellow-100 text-yellow-700"
-                            )}>
-                              {appointment.status}
-                            </span>
-                          </div>
-                          <div className="flex gap-4 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {appointment.date}</span>
-                            <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {appointment.timeSlot}</span>
-                          </div>
-                        </div>
-                        
-                        {appointment.status === "pending" && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="text-destructive hover:bg-destructive/10"
-                              >
-                                <Trash2 className="h-5 w-5" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Appointment?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to cancel your {category?.name || appointment.category} session on {appointment.date}? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Keep Appointment</AlertDialogCancel>
-                                <AlertDialogAction 
-                                  onClick={() => handleDelete(appointment.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                  Delete Permanently
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
+                  <div className="flex items-center gap-3 text-sm">
+                    <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                      <Clock className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Time</p>
+                      <p className="font-medium">{appointment.time}</p>
+                    </div>
+                  </div>
+
+                  {appointment.notes && (
+                    <div className="flex items-start gap-3 text-sm pt-2 border-t mt-2">
+                      <div className="p-2 bg-muted rounded-lg text-muted-foreground mt-0.5">
+                        <FileText className="h-4 w-4" />
                       </div>
-                    </Card>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <CalendarX className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No Appointments Found</h3>
-              </div>
-            )}
+                      <div>
+                        <p className="text-muted-foreground text-xs">Notes</p>
+                        <p className="text-muted-foreground italic line-clamp-2">
+                          "{appointment.notes}"
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+
+                <CardFooter className="bg-muted/10 border-t pt-3 pb-3">
+                  <Button variant="ghost" className="w-full text-xs h-8 text-muted-foreground hover:text-primary">
+                    <AlertCircle className="mr-2 h-3 w-3" />
+                    Need to reschedule?
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
           </div>
         )}
       </div>
