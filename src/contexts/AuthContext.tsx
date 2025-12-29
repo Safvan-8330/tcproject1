@@ -101,6 +101,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       return { success: false, error: error.message };
     }
 
+    // --- FIX APPLIED HERE ---
+    // Manually await the session update so state is ready before navigation happens
+    if (data.session) {
+      await handleUserSession(data.session.user);
+    }
+    // ----------------------
+
     return { success: true };
   };
 
