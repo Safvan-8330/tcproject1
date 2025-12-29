@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { format } from "date-fns";
-import { CalendarIcon, Clock, User, Mail, FileText, ArrowLeft, CheckCircle, Stethoscope, Scissors, Wrench, Sparkles, Dumbbell, SmilePlus } from "lucide-react";
+import { CalendarIcon, Clock, FileText, ArrowLeft, CheckCircle, Stethoscope, Scissors, Wrench, Sparkles, Dumbbell, SmilePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,9 +41,8 @@ const BookAppointment = () => {
 
   const preselectedCategory = searchParams.get('category') as AppointmentCategory | null;
 
+  // 1. UPDATED STATE: Removed name and email
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
     date: undefined as Date | undefined,
     timeSlot: "",
     reason: "",
@@ -66,7 +64,8 @@ const BookAppointment = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.email || !formData.date || !formData.timeSlot || !formData.category) {
+    // 2. UPDATED VALIDATION: Removed checks for name and email
+    if (!formData.date || !formData.timeSlot || !formData.category) {
       toast({
         title: "Missing Fields",
         description: "Please fill in all required fields.",
@@ -78,7 +77,6 @@ const BookAppointment = () => {
     setIsLoading(true);
 
     try {
-      // 1. Get current authenticated user
       const { data: { user }, error: authError } = await supabase.auth.getUser();
 
       if (authError || !user) {
@@ -91,17 +89,17 @@ const BookAppointment = () => {
         return;
       }
 
-      // 2. Insert into Supabase matching your screenshot schema
+      // 3. INSERT LOGIC: Remains the same (it relies on user.id, not form inputs)
       const { error } = await supabase
         .from('appointments')
         .insert([
           {
             user_id: user.id,
-            date: format(formData.date, "yyyy-MM-dd"), // Matches 'date' column (type: date)
-            time: formData.timeSlot,                  // Matches 'time' column (type: text)
-            service: formData.category,               // Matches 'service' column (type: text)
-            notes: formData.reason || null,           // Matches 'notes' column (type: text)
-            status: 'pending'                         // Matches 'status' column (type: text)
+            date: format(formData.date, "yyyy-MM-dd"),
+            time: formData.timeSlot,
+            service: formData.category,
+            notes: formData.reason || null,
+            status: 'pending'
           }
         ]);
 
@@ -250,41 +248,13 @@ const BookAppointment = () => {
             </div>
             <CardTitle className="text-2xl">{selectedCategory?.name} Appointment</CardTitle>
             <CardDescription>
-              Fill in your details and select your preferred date and time
+              Select your preferred date and time
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label htmlFor="name" className="flex items-center gap-2 text-sm font-medium">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    Full Name *
-                  </label>
-                  <Input
-                    id="name"
-                    placeholder="John Doe"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="h-11"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="email" className="flex items-center gap-2 text-sm font-medium">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    Email Address *
-                  </label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="john@example.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="h-11"
-                  />
-                </div>
-              </div>
+              
+              {/* 4. REMOVED INPUTS: Name and Email fields deleted from here */}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
