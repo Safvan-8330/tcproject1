@@ -9,6 +9,18 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+// 1. Import the Alert Dialog components
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const MyAppointments = () => {
   const { user } = useAuth();
@@ -69,10 +81,7 @@ const MyAppointments = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm("Are you sure you want to permanently delete this pending appointment?")) {
-      return;
-    }
-
+    // window.confirm is removed because the UI handles it now
     try {
       const { error } = await supabase
         .from('appointments')
@@ -167,16 +176,35 @@ const MyAppointments = () => {
                           </div>
                         </div>
                         
-                        {/* ONLY SHOW DELETE BUTTON IF STATUS IS PENDING */}
                         {appointment.status === "pending" && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="text-destructive hover:bg-destructive/10"
-                            onClick={() => handleDelete(appointment.id)}
-                          >
-                            <Trash2 className="h-5 w-5" />
-                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="text-destructive hover:bg-destructive/10"
+                              >
+                                <Trash2 className="h-5 w-5" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Appointment?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to cancel your {category?.name || appointment.category} session on {appointment.date}? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Keep Appointment</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={() => handleDelete(appointment.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete Permanently
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         )}
                       </div>
                     </Card>
