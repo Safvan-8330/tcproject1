@@ -1,11 +1,12 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom"; // 1. Import Navigate
 import { useAuth } from "@/contexts/AuthContext";
 import Home from "./index.tsx";
 
 const LandingPage = () => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  // 2. Destructure isAdmin from useAuth
+  const { isAuthenticated, isAdmin } = useAuth();
 
   useEffect(() => {
     // Redirect based on authentication status
@@ -15,8 +16,14 @@ const LandingPage = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  // If user is authenticated, show the home page
+  // If user is authenticated...
   if (isAuthenticated) {
+    // 3. NEW CHECK: If they are an admin, redirect to Admin Dashboard
+    if (isAdmin) {
+      return <Navigate to="/admin" replace />;
+    }
+    
+    // Otherwise, show the regular Home page
     return <Home />;
   }
 
